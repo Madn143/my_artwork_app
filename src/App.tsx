@@ -62,11 +62,6 @@ function App() {
 
       let url = `https://api.artic.edu/api/v1/artworks?page=${currentPage}&limit=${rows}`;
 
-      if (sortField && (sortOrder === 1 || sortOrder === -1)) {
-        const sortDirection = sortOrder === 1 ? 'asc' : 'desc';
-        url += `&sort[${sortField}][order]=${sortDirection}`;
-      }
-
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -74,7 +69,28 @@ function App() {
       }
 
       const apiResponse: ApiResponse = await response.json();
-      const fetchedArtworks = apiResponse.data;
+      let fetchedArtworks = apiResponse.data;
+
+      // CLIENT-SIDE SORTING: Apply sorting to the current page's data
+      if (sortField && (sortOrder === 1 || sortOrder === -1)) { // Explicitly check for 1 or -1
+        fetchedArtworks = [...fetchedArtworks].sort((a, b) => {
+          const valA = a[sortField as keyof Artwork];
+          const valB = b[sortField as keyof Artwork];
+
+          if (valA === null && valB === null) return 0;
+          if (valA === null) return sortOrder === 1 ? 1 : -1;
+          if (valB === null) return sortOrder === 1 ? -1 : 1;
+
+          if (typeof valA === 'string' && typeof valB === 'string') {
+            return sortOrder * valA.localeCompare(valB);
+          }
+          if (typeof valA === 'number' && typeof valB === 'number') {
+            return sortOrder * (valA - valB);
+          }
+          return 0;
+        });
+      }
+
       setArtworks(fetchedArtworks);
       setTotalRecords(apiResponse.pagination.total);
 
@@ -104,7 +120,7 @@ function App() {
   const onSort = (event: DataTableSortEvent) => {
     setSortField(event.sortField);
     setSortOrder(event.sortOrder);
-    setCurrentPage(1);
+    fetchArtworks();
   };
 
   const onSelectionChange = (e: { value: Artwork[] }) => {

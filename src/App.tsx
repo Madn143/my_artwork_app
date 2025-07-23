@@ -1,124 +1,237 @@
-import { useEffect, useState, useRef } from "react";
-import {
-  DataTable,
-  DataTableSelectionChangeEvent,
-  DataTablePageEvent
-} from "primereact/datatable";
-import { Column } from "primereact/column";
-import { Artwork } from "./types/artwork";
-import { getArtworksByPage } from "./services/api";
-import { Card } from "primereact/card";
-import { Button } from "primereact/button";
-import "primereact/resources/themes/lara-light-indigo/theme.css";
-import "primereact/resources/primereact.min.css";
-import "primeicons/primeicons.css";
-import "./App.css";
+import React, { useState, useEffect, useCallback } from 'react';
+import './App.css';
+
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+
+import type {
+  DataTableStateEvent,
+  DataTableSortEvent
+} from 'primereact/datatable';
+
+interface Artwork {
+  id: number;
+  title: string;
+  place_of_origin: string;
+  artist_display: string;
+  inscriptions: string | null;
+  date_start: number;
+  date_end: number;
+}
+
+interface Pagination {
+  total: number;
+  limit: number;
+  offset: number;
+  total_pages: number;
+  current_page: number;
+  next_url: string | null;
+  prev_url: string | null;
+}
+
+interface ApiResponse {
+  data: Artwork[];
+  pagination: Pagination;
+}
+
+interface CustomDataTableSelectAllEvent {
+    originalEvent: React.SyntheticEvent;
+    checked: boolean;
+}
 
 function App() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
-  const [selectedRows, setSelectedRows] = useState<{ [id: string]: Artwork }>({});
-  const rowsPerPage = 10;
-  const selectedPageRef = useRef<{ [page: number]: string[] }>({});
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [totalRecords, setTotalRecords] = useState<number>(0);
+  const [first, setFirst] = useState<number>(0);
+  const [rows, setRows] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<1 | -1 | 0 | null | undefined>(null);
+
+  const [selectedArtworks, setSelectedArtworks] = useState<Artwork[]>([]);
+  const [allSelectedArtworks, setAllSelectedArtworks] = useState<Artwork[]>([]);
+
+  const fetchArtworks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let url = `https://api.artic.edu/api/v1/artworks?page=${currentPage}&limit=${rows}`;
+
+      if (sortField && (sortOrder === 1 || sortOrder === -1)) {
+        const sortDirection = sortOrder === 1 ? 'asc' : 'desc';
+        url += `&sort[${sortField}][order]=${sortDirection}`;
+      }
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const apiResponse: ApiResponse = await response.json();
+      const fetchedArtworks = apiResponse.data;
+      setArtworks(fetchedArtworks);
+      setTotalRecords(apiResponse.pagination.total);
+
+      const currentlySelectedOnPage = fetchedArtworks.filter(artwork =>
+          allSelectedArtworks.some(selected => selected.id === artwork.id)
+      );
+      setSelectedArtworks(currentlySelectedOnPage);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, rows, sortField, sortOrder, allSelectedArtworks]);
 
   useEffect(() => {
-    loadPage(page);
-  }, [page]);
+    fetchArtworks();
+  }, [fetchArtworks]);
 
-  const loadPage = async (pageIndex: number) => {
-    setLoading(true);
-    const response = await getArtworksByPage(pageIndex + 1);
-    setArtworks(response.data);
-    setTotalRecords(response.total);
-    setLoading(false);
+  const onPage = (event: DataTableStateEvent) => {
+    setFirst(event.first);
+    setRows(event.rows);
+    const newPage = (event.page ?? 0) + 1;
+    setCurrentPage(newPage);
   };
 
-  const onPageChange = (event: DataTablePageEvent) => {
-    setPage(event.page);
+  const onSort = (event: DataTableSortEvent) => {
+    setSortField(event.sortField);
+    setSortOrder(event.sortOrder);
+    setCurrentPage(1);
   };
 
-  const onSelectionChange = (e: DataTableSelectionChangeEvent) => {
-    const newSelected: { [id: string]: Artwork } = { ...selectedRows };
-    const selectedArtworks: Artwork[] = e.value || [];
+  const onSelectionChange = (e: { value: Artwork[] }) => {
+    const currentSelectedOnPage = e.value;
+    setSelectedArtworks(currentSelectedOnPage);
 
-    const currentPageSelectedIds = selectedArtworks.map((art) => art.id.toString());
-    selectedPageRef.current[page] = currentPageSelectedIds;
+    setAllSelectedArtworks((prevAllSelected) => {
+      const newAllSelected = new Set(prevAllSelected.map(item => item.id));
 
-    artworks.forEach((art) => {
-      const id = art.id.toString();
-      if (currentPageSelectedIds.includes(id)) {
-        newSelected[id] = art;
-      } else {
-        delete newSelected[id];
-      }
+      currentSelectedOnPage.forEach(artwork => {
+        newAllSelected.add(artwork.id);
+      });
+
+      artworks.forEach(artwork => {
+        if (!currentSelectedOnPage.some(item => item.id === artwork.id)) {
+          newAllSelected.delete(artwork.id);
+        }
+      });
+
+      return Array.from(newAllSelected).map(id =>
+          artworks.find(artwork => artwork.id === id) || prevAllSelected.find(artwork => artwork.id === id)
+      ).filter(Boolean) as Artwork[];
     });
-
-    setSelectedRows(newSelected);
   };
 
-  const selectedArray = Object.values(selectedRows);
+  const onSelectAllChange = (event: CustomDataTableSelectAllEvent) => {
+    let newSelectedArtworks: Artwork[];
+    if (event.checked) {
+      newSelectedArtworks = artworks;
+    } else {
+      newSelectedArtworks = [];
+    }
+    setSelectedArtworks(newSelectedArtworks);
+
+    setAllSelectedArtworks((prevAllSelected) => {
+      const newAllSelected = new Set(prevAllSelected.map(item => item.id));
+
+      if (event.checked) {
+        artworks.forEach(artwork => newAllSelected.add(artwork.id));
+      } else {
+        artworks.forEach(artwork => newAllSelected.delete(artwork.id));
+      }
+      return Array.from(newAllSelected).map(id =>
+          artworks.find(artwork => artwork.id === id) || prevAllSelected.find(artwork => artwork.id === id)
+      ).filter(Boolean) as Artwork[];
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 font-sans">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-indigo-700 mb-6">
-          🎨 Art Explorer
-        </h1>
+    <div className="App">
+      <h1>Artworks Data Table</h1>
 
-        <Card className="shadow-2xl rounded-2xl">
+      {error && <p style={{ color: 'red', marginBottom: '20px' }}>Error: {error}</p>}
+
+      {!error && (
+        <div className="card">
+
+          {allSelectedArtworks.length > 0 && (
+            <div style={{
+                marginTop: '20px',
+                padding: '15px',
+                border: '1px solid #007ad9',
+                borderRadius: '5px',
+                marginBottom: '20px',
+                backgroundColor: '#e3f2fd'
+            }}>
+              <h3>Selected Artworks: {allSelectedArtworks.length}</h3>
+              <button
+                onClick={() => {
+                  setAllSelectedArtworks([]);
+                  setSelectedArtworks([]);
+                }}
+                style={{
+                  padding: '8px 15px',
+                  cursor: 'pointer',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  marginTop: '10px'
+                }}
+              >
+                Clear All Selections
+              </button>
+            </div>
+          )}
+
           <DataTable
             value={artworks}
+            tableStyle={{ minWidth: '50rem' }}
+            dataKey="id"
+            className="my-datatable"
+
             paginator
-            rows={rowsPerPage}
+            rows={rows}
             totalRecords={totalRecords}
+            first={first}
+            onPage={onPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
             lazy
             loading={loading}
-            onPage={onPageChange}
-            first={page * rowsPerPage}
-            selection={Object.values(selectedRows).filter((row) => selectedPageRef.current[page]?.includes(row.id.toString()))}
+            responsiveLayout="scroll"
+
+            selectionMode="multiple"
+            selection={selectedArtworks}
             onSelectionChange={onSelectionChange}
-            selectionMode="checkbox"
-            dataKey="id"
-            className="p-datatable-sm p-datatable-gridlines rounded-xl overflow-hidden"
+            onSelectAllChange={onSelectAllChange}
+
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={onSort}
+            multiSortMeta={[]}
           >
             <Column selectionMode="multiple" headerStyle={{ width: '3rem' }}></Column>
             <Column field="title" header="Title" sortable></Column>
-            <Column field="place_of_origin" header="Origin" sortable></Column>
-            <Column field="artist_display" header="Artist" sortable></Column>
-            <Column field="inscriptions" header="Inscriptions"></Column>
-            <Column field="date_start" header="Start Date" sortable></Column>
-            <Column field="date_end" header="End Date" sortable></Column>
+            <Column field="place_of_origin" header="Place of Origin" sortable></Column>
+            <Column field="artist_display" header="Artist Display" sortable></Column>
+            <Column field="inscriptions" header="Inscriptions" sortable></Column>
+            <Column field="date_start" header="Date Start" sortable></Column>
+            <Column field="date_end" header="Date End" sortable></Column>
           </DataTable>
-        </Card>
 
-        {selectedArray.length > 0 && (
-          <div className="mt-8">
-            <Card className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-xl shadow-md">
-              <h2 className="text-xl font-semibold text-indigo-700 mb-2">
-                Selected Artworks ({selectedArray.length})
-              </h2>
-              <ul className="space-y-1">
-                {selectedArray.map((art) => (
-                  <li key={art.id} className="text-gray-700">
-                    <strong>{art.title}</strong> — {art.artist_display || 'Unknown Artist'}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                label="Clear Selection"
-                icon="pi pi-times"
-                className="mt-4 p-button-danger"
-                onClick={() => {
-                  setSelectedRows({});
-                  selectedPageRef.current = {};
-                }}
-              />
-            </Card>
-          </div>
-        )}
-      </div>
+          {!loading && !error && artworks.length === 0 && (
+            <p>No artworks found.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

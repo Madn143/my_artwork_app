@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import { OverlayPanel } from 'primereact/overlaypanel';
+import { InputNumber } from 'primereact/inputnumber';
+import { Button } from 'primereact/button';
+import { ProgressSpinner } from 'primereact/progressspinner';
 
 import type {
   DataTableStateEvent,
@@ -55,6 +59,11 @@ function App() {
   const [selectedArtworks, setSelectedArtworks] = useState<Artwork[]>([]);
   const [allSelectedArtworks, setAllSelectedArtworks] = useState<Artwork[]>([]);
 
+  // Bulk Selection States
+  const op = useRef<OverlayPanel>(null);
+  const [numRowsToSelect, setNumRowsToSelect] = useState<number | null>(null);
+  const [bulkSelecting, setBulkSelecting] = useState<boolean>(false);
+
   const fetchArtworks = useCallback(async () => {
     try {
       setLoading(true);
@@ -72,7 +81,7 @@ function App() {
       let fetchedArtworks = apiResponse.data;
 
       // CLIENT-SIDE SORTING: Apply sorting to the current page's data
-      if (sortField && (sortOrder === 1 || sortOrder === -1)) { // Explicitly check for 1 or -1
+      if (sortField && (sortOrder === 1 || sortOrder === -1)) {
         fetchedArtworks = [...fetchedArtworks].sort((a, b) => {
           const valA = a[sortField as keyof Artwork];
           const valB = b[sortField as keyof Artwork];
@@ -94,6 +103,7 @@ function App() {
       setArtworks(fetchedArtworks);
       setTotalRecords(apiResponse.pagination.total);
 
+      // Re-evaluate selections for the current page based on allSelectedArtworks
       const currentlySelectedOnPage = fetchedArtworks.filter(artwork =>
           allSelectedArtworks.some(selected => selected.id === artwork.id)
       );
@@ -134,6 +144,7 @@ function App() {
         newAllSelected.add(artwork.id);
       });
 
+      // Remove items from allSelectedArtworks that were deselected on the current page
       artworks.forEach(artwork => {
         if (!currentSelectedOnPage.some(item => item.id === artwork.id)) {
           newAllSelected.delete(artwork.id);
@@ -168,6 +179,153 @@ function App() {
       ).filter(Boolean) as Artwork[];
     });
   };
+
+  // Bulk Selection Logic
+  const handleBulkSelect = async () => {
+    if (numRowsToSelect === null || numRowsToSelect <= 0) {
+      return;
+    }
+
+    setBulkSelecting(true); // Start bulk selecting loading state
+    op.current?.hide(); // Hide the overlay immediately
+
+    let itemsToFetchCount = Math.min(numRowsToSelect, totalRecords); // Don't try to select more than total available
+
+    let newFetchedArtworks: Artwork[] = [];
+    let currentPageForFetch = 1;
+
+    try {
+        // Fetch pages sequentially until enough items are gathered or all pages are fetched
+        while (newFetchedArtworks.length < itemsToFetchCount && currentPageForFetch <= totalRecords / rows + 1) {
+            const url = `https://api.artic.edu/api/v1/artworks?page=${currentPageForFetch}&limit=${rows}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const apiResponse: ApiResponse = await response.json();
+            newFetchedArtworks.push(...apiResponse.data);
+            currentPageForFetch++;
+        }
+
+        // Take only the requested number of items
+        const selectedItems = newFetchedArtworks.slice(0, itemsToFetchCount);
+
+        setAllSelectedArtworks((prevAllSelected) => {
+            const newAllSelected = new Set(prevAllSelected.map(item => item.id));
+            selectedItems.forEach(artwork => newAllSelected.add(artwork.id));
+            return Array.from(newAllSelected).map(id =>
+                // Try to find the artwork from selectedItems first, then prevAllSelected if not found
+                selectedItems.find(item => item.id === id) || prevAllSelected.find(item => item.id === id)
+            ).filter(Boolean) as Artwork[];
+        });
+
+        // Update selectedArtworks for the current visible page
+        const currentlySelectedOnPage = artworks.filter(artwork =>
+            selectedItems.some(selected => selected.id === artwork.id)
+        );
+        setSelectedArtworks(currentlySelectedOnPage);
+
+    } catch (err: any) {
+        setError(`Failed to bulk select: ${err.message}`);
+    } finally {
+        setBulkSelecting(false); // End bulk selecting loading state
+        setNumRowsToSelect(null); // Clear input
+    }
+  };
+
+
+  const headerCheckboxTemplate = (options: any) => {
+    return (
+      <div className="p-checkbox-wrapper"
+           style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {options.children} {/* This is the default PrimeReact checkbox */}
+        <Button
+          icon="pi pi-angle-down" // Changed icon to a down arrow for "more options"
+          className="p-button-sm bulk-select-trigger" // Use the class for hover effect
+          onClick={(e) => op.current?.toggle(e)}
+          aria-haspopup
+          aria-controls="overlay_panel"
+          style={{
+              width: '24px', // Fixed width for a small button
+              height: '24px', // Fixed height for a small button
+              padding: '0', // Remove padding
+              backgroundColor: '#6c757d', /* Ash color */
+              color: '#ffffff', /* White icon */
+              border: '1px solid #6c757d',
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              transition: 'background-color 0.2s, border-color 0.2s'
+          }}
+          onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#5a6268';
+              e.currentTarget.style.borderColor = '#5a6268';
+          }}
+          onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#6c757d';
+              e.currentTarget.style.borderColor = '#6c757d';
+          }}
+        />
+        <OverlayPanel ref={op} appendTo={document.body} id="overlay_panel"
+                      style={{
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          border: 'none',
+                          backgroundColor: '#ffffff'
+                      }}>
+          <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <h5 style={{ margin: '0', fontSize: '1.1em', color: '#333' }}>Bulk Select</h5>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label htmlFor="num-rows-select" style={{ minWidth: '80px', color: '#555' }}>Select first:</label>
+              <InputNumber
+                id="num-rows-select"
+                value={numRowsToSelect}
+                onValueChange={(e) => setNumRowsToSelect(e.value ?? null)}
+                mode="decimal"
+                showButtons
+                min={0}
+                max={totalRecords}
+                className="p-inputtext-sm"
+                inputStyle={{ width: '100px' }}
+                placeholder="Number of rows"
+              />
+            </div>
+            {bulkSelecting ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                    <ProgressSpinner style={{ width: '25px', height: '25px', stroke: '#007ad9' }} strokeWidth="8" animationDuration=".5s" />
+                    <small style={{ color: '#555' }}>Selecting...</small>
+                </div>
+            ) : (
+                <Button
+                  label="Apply Selection"
+                  icon="pi pi-check"
+                  onClick={handleBulkSelect}
+                  className="p-button-sm"
+                  style={{
+                      backgroundColor: '#6c757d', /* Ash color */
+                      color: '#ffffff',
+                      border: '1px solid #6c757d',
+                      padding: '10px 15px',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      transition: 'background-color 0.2s, border-color 0.2s',
+                      width: '100%'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#495057', e.currentTarget.style.borderColor = '#495057')} /* Darker ash on hover */
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#6c757d', e.currentTarget.style.borderColor = '#6c757d')}
+                  disabled={numRowsToSelect === null || numRowsToSelect <= 0}
+                />
+            )}
+            <small style={{ color: '#666', fontSize: '0.85em', textAlign: 'center' }}>
+                Note: Selecting a large number of rows may take time as data is fetched from multiple pages.
+            </small>
+          </div>
+        </OverlayPanel>
+      </div>
+    );
+  };
+
 
   return (
     <div className="App">
@@ -221,7 +379,7 @@ function App() {
             onPage={onPage}
             rowsPerPageOptions={[5, 10, 25, 50]}
             lazy
-            loading={loading}
+            loading={loading || bulkSelecting}
             responsiveLayout="scroll"
 
             selectionMode="multiple"
@@ -234,7 +392,8 @@ function App() {
             onSort={onSort}
             multiSortMeta={[]}
           >
-            <Column selectionMode="multiple" headerStyle={{ width: '3rem' }}></Column>
+            {/* Using a custom header for the selection column */}
+            <Column selectionMode="multiple" header={headerCheckboxTemplate} headerStyle={{ width: '3rem' }}></Column>
             <Column field="title" header="Title" sortable></Column>
             <Column field="place_of_origin" header="Place of Origin" sortable></Column>
             <Column field="artist_display" header="Artist Display" sortable></Column>

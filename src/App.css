@@ -1,243 +1,104 @@
-/* General App styling */
+/* General styling for the app */
 .App {
-  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Arial', sans-serif;
   text-align: center;
-  padding: 0;
-  background-color: #ffffff;
+  padding: 20px;
+  background-color: #f5f5f5;
   min-height: 100vh;
-  color: #343a3f; /* Slightly adjusted color for better contrast */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
 }
 
 h1 {
-  color: #212529;
+  color: #333;
   margin-bottom: 30px;
-  margin-top: 30px;
-  font-weight: 600;
 }
 
-/* Styling for the DataTable container (.card) */
 .card {
-  background-color: transparent;
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-  margin: 0;
-  width: 100%;
-  max-width: 100%;
-  overflow: auto;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+  max-width: 90%;
+  overflow-x: auto; /* Ensures table is scrollable on smaller screens */
 }
 
-/* Custom styling for the DataTable itself */
-.p-datatable.my-datatable {
-  border-radius: 0;
-  overflow: hidden;
-  box-shadow: none;
-  background-color: #ffffff;
+/* PrimeReact DataTable custom styling */
+.p-datatable {
   border: 1px solid #e0e0e0;
-  width: fit-content;
-  margin-bottom: 20px;
-}
-
-/* Table Header */
-.p-datatable .p-datatable-header {
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  padding: 0.8rem 1rem;
-  font-size: 0.9rem;
+  border-radius: 8px;
+  overflow: hidden; /* Ensures rounded corners */
 }
 
 .p-datatable .p-datatable-thead > tr > th {
-  background-color: #f5f5f5;
-  color: #5f6368;
-  font-weight: 500;
-  padding: 0.7rem 1rem;
+  background-color: #f8f8f8;
+  color: #555;
+  font-weight: bold;
+  padding: 12px 15px;
   border-color: #e0e0e0;
-  position: relative;
-  user-select: none;
-}
-
-.p-column-header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-}
-
-.p-column-header-content .p-column-title {
-  flex-grow: 1;
-}
-
-/* SORT ICON STYLING: Hidden by default, visible on hover or when actively sorted */
-.p-datatable-thead > tr > th .p-sortable-column-icon {
-  opacity: 0; /* Hidden by default */
-  transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
-  color: #707070; /* Default subtle color */
-  font-size: 0.8em;
-}
-
-/* Make icon visible and darker on hover for any sortable column */
-.p-datatable-thead > tr > th.p-sortable-column:hover .p-sortable-column-icon {
-  opacity: 1;
-  color: #212529; /* Darker on hover */
-}
-
-/* Make icon visible and prominent when column is actively sorted */
-.p-datatable-thead > tr > th.p-sortable-column.p-highlight .p-sortable-column-icon {
-  opacity: 1; /* Always visible when sorted */
-  color: #1a73e8; /* Google Blue for active sort */
-}
-
-/* Change cursor on sortable columns */
-.p-datatable-thead > tr > th.p-sortable-column {
-  cursor: pointer;
-}
-
-/* Row Hover Effect for header */
-.p-datatable-thead > tr > th.p-sortable-column:hover {
-  background-color: #e8e8e8;
-}
-
-/* Table Body Rows */
-.p-datatable .p-datatable-tbody > tr {
-  background-color: #ffffff;
-  transition: background-color 0.15s ease-in-out;
 }
 
 .p-datatable .p-datatable-tbody > tr > td {
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid #eeeeee;
-  border-right: 1px solid #f8f8f8;
-  color: #3c4043;
-  font-size: 0.875rem;
+  padding: 10px 15px;
+  border-color: #f0f0f0;
 }
 
-.p-datatable .p-datatable-tbody > tr > td:last-child {
-  border-right: none;
-}
-
-/* Alternate row background */
 .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-  background-color: #fcfcfc;
+  background-color: #fdfdfd;
 }
 
-/* Row Hover Effect for body rows */
-.p-datatable .p-datatable-tbody > tr:not(.p-highlight):hover {
+.p-datatable .p-datatable-tbody > tr.p-highlight {
+  background-color: #e0f2f7 !important; /* Lighter blue for selected rows */
+  color: #333;
+}
+
+/* Hover effect for sortable columns */
+.p-datatable .p-sortable-column:hover {
   background-color: #f0f0f0;
   cursor: pointer;
 }
 
-/* Selected Rows */
-.p-datatable .p-highlight {
-  background-color: #e6f4ff !important;
-  color: #1a73e8 !important;
-  font-weight: 500;
+/* Hide sort icon by default, show on hover or when sorted */
+.p-datatable .p-sortable-column .p-sortable-column-icon {
+  visibility: hidden;
 }
 
-/* Pagination */
-.p-datatable .p-paginator {
-  background-color: #f5f5f5;
+.p-datatable .p-sortable-column:hover .p-sortable-column-icon,
+.p-datatable .p-sortable-column.p-highlight .p-sortable-column-icon {
+  visibility: visible;
+}
+
+/* Custom styling for pagination */
+.p-paginator {
+  background-color: #f8f8f8;
   border-top: 1px solid #e0e0e0;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  padding: 0.75rem 1rem;
-}
-
-/* Pagination Buttons (Default, Hover, Active) */
-.p-paginator .p-paginator-pages .p-paginator-page {
-    background-color: transparent;
-    color: #5f6368;
-    border-radius: 4px;
-    margin: 0 2px;
-    min-width: 2rem;
-    height: 2rem;
-    line-height: 2rem;
-    transition: background-color 0.2s, color 0.2s;
-    font-size: 0.875rem;
-}
-
-.p-paginator .p-paginator-pages .p-paginator-page:hover {
-    background-color: #e8e8e8;
-    color: #212529;
+  padding: 10px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .p-paginator .p-paginator-pages .p-paginator-page.p-highlight {
-    background-color: #e0e0e0 !important;
-    color: #212529 !important;
-    font-weight: 600;
+  background-color: #007ad9;
+  color: #ffffff;
+  border-radius: 50%;
 }
 
-/* Navigation Arrows (Prev/Next) */
-.p-paginator .p-paginator-prev,
-.p-paginator .p-paginator-next,
-.p-paginator .p-paginator-first,
-.p-paginator .p-paginator-last {
-    background-color: transparent;
-    color: #5f6368;
-    border-radius: 4px;
-    min-width: 2rem;
-    height: 2rem;
-    transition: background-color 0.2s, color 0.2s;
-}
-
-.p-paginator .p-paginator-prev:hover,
-.p-paginator .p-paginator-next:hover,
-.p-paginator .p-paginator-first:hover,
-.p-paginator .p-paginator-last:hover {
-    background-color: #e8e8e8;
-    color: #212529;
-}
-
-/* Rows per page dropdown */
 .p-paginator .p-dropdown {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    color: #495057;
-    font-size: 0.875rem;
-    padding: 0.5rem 0.75rem;
-}
-
-/* Clear All Selections Button */
-button {
-  padding: 8px 16px;
-  cursor: pointer;
-  background-color: #dc3545;
-  color: white;
-  border: none;
   border-radius: 4px;
-  font-size: 0.9rem;
-  transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-button:hover {
-  background-color: #c82333;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+
+/* Initially hide the bulk-select-trigger button */
+.p-datatable-thead .p-checkbox-wrapper .bulk-select-trigger {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
 }
 
-/* Checkbox specific styling */
-.p-checkbox .p-checkbox-box {
-  border-radius: 3px;
-  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border: 1px solid #a0a0a0;
-  background-color: #ffffff;
+/* Show the bulk-select-trigger button on hover of the p-checkbox-wrapper */
+.p-datatable-thead .p-checkbox-wrapper:hover .bulk-select-trigger {
+    opacity: 1;
 }
 
-.p-checkbox.p-highlight .p-checkbox-box {
-  border-color: #1a73e8;
-  background-color: #1a73e8;
-}
-
-.p-checkbox:not(.p-checkbox-disabled) .p-checkbox-box:hover {
-  border-color: #1a73e8;
+/* Ensure the checkbox itself is always visible */
+.p-datatable-thead .p-checkbox-wrapper .p-checkbox {
+    opacity: 1 !important; /* Override any potential opacity from parent for the checkbox itself */
 }
